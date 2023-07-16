@@ -5,10 +5,6 @@ import (
 	"github.com/sampgo/sampgo"
 )
 
-const (
-	BotPrefix = "TBot"
-)
-
 type (
 	botNumber = int
 	playerID  = int
@@ -59,6 +55,30 @@ func New() *T {
 	return t
 }
 
+func (t *T) Tbready(id int) {
+	t.players[id].Ready = true
+	groupID := t.players[id].BotGroupID
+
+	var bots []*BotInfo
+	for _, bot := range t.bots {
+		if bot.BotGroupID != groupID {
+			continue
+		}
+		if !bot.Ready {
+			return
+		}
+		bots = append(bots, bot)
+	}
+
+	for _, bot := range bots {
+		sampgo.SendClientMessage(bot.ID, 0x000002, " ")
+		if bot.Car != NoCar && bot.SeatID != 0 {
+			sampgo.PutPlayerInVehicle(bot.ID, bot.Car, bot.SeatID)
+		}
+		sampgo.SetPlayerSkin(bot.ID, bot.Skin)
+	}
+}
+
 func (t *T) TBot(id int, botNum int, isSingle bool) {
 	if !t.IsRecording(id) {
 		t.StartRecording(id, botNum, isSingle)
@@ -78,7 +98,7 @@ func (t *T) Tgrs(groupID int) {
 func (t *T) Trs(botNum int) {
 	bot, ok := t.bots[botNum]
 	if !ok {
-		sampgo.SendClientMessage(0, 0xFF0000, "ROFL 0")
+		sampgo.SendClientMessage(0, 0xFF0000, "bot doesn't exist")
 		return
 	}
 
@@ -87,23 +107,7 @@ func (t *T) Trs(botNum int) {
 	}
 
 	botName := fmt.Sprintf("%s%d", BotPrefix, botNum)
-
-	var script string
-	switch bot.Car {
-	case NoCar:
-		if bot.IsSingle {
-			script = fmt.Sprintf("tbotfootsingle%d", botNum)
-		} else {
-			script = fmt.Sprintf("tbotfoot%d", botNum)
-		}
-	default:
-		if bot.IsSingle {
-			script = fmt.Sprintf("tbotcarsingle%d", botNum)
-		} else {
-			script = fmt.Sprintf("tbotcar%d", botNum)
-		}
-	}
-	sampgo.ConnectNPC(botName, script)
+	sampgo.ConnectNPC(botName, "tbot")
 }
 
 func (t *T) Tdelall() {
@@ -158,4 +162,34 @@ func (t *T) Tlist() []string {
 		list = append(list, info)
 	}
 	return list
+}
+
+func (t *T) Tbinit(id int) (recording string, recType int, isSingle int, groupID int) {
+	bot, ok := t.players[id]
+	if !ok {
+		sampgo.Print("tbinit: bot player not found!")
+		return
+	}
+
+	if bot.Car != NoCar {
+		recording = fmt.Sprintf("tbotcar%d", bot.Number)
+		if bot.SeatID == sampgo.SeatDriver {
+			recType = sampgo.PlayerRecordingTypeDriver
+		} else {
+			recType = 3 // Passenger
+		}
+	} else {
+		recording = fmt.Sprintf("tbotfoot%d", bot.Number)
+		recType = sampgo.PlayerRecordingTypeOnfoot
+	}
+
+	if bot.IsSingle {
+		isSingle = 1
+	} else {
+		isSingle = 0
+	}
+
+	groupID = bot.BotGroupID
+
+	return
 }

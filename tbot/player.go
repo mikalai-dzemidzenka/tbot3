@@ -42,6 +42,20 @@ func (t *T) ConnectPlayer(id int) {
 	}
 }
 
+func (t *T) GetPlayersInGroup(groupID int) []int {
+	var res []int
+	for _, p := range t.players {
+		if p.BotInfo != nil {
+			continue
+		}
+
+		if p.PlayerGroupID == groupID {
+			res = append(res, p.ID)
+		}
+	}
+	return res
+}
+
 func (t *T) IsRecording(id int) bool {
 	p, ok := t.players[id]
 	if !ok {
@@ -77,12 +91,14 @@ func (t *T) StartRecording(id int, botNum int, isSingle bool) {
 	case sampgo.PlayerStateDriver, sampgo.PlayerStatePassenger:
 		t.bots[botNum] = &BotInfo{
 			ID:                BotNotConnected,
+			Number:            botNum,
 			BotGroupID:        t.players[id].PlayerGroupID,
 			Skin:              sampgo.GetPlayerSkin(id),
 			Car:               sampgo.GetPlayerVehicleID(id),
 			SeatID:            sampgo.GetPlayerVehicleSeat(id),
 			IsSingle:          isSingle,
 			RecordingPlayerID: id,
+			State:             sampgo.PlayerRecordingTypeDriver,
 		}
 
 		t.players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeDriver
@@ -90,12 +106,14 @@ func (t *T) StartRecording(id int, botNum int, isSingle bool) {
 	default:
 		t.bots[botNum] = &BotInfo{
 			ID:                BotNotConnected,
+			Number:            botNum,
 			BotGroupID:        t.players[id].PlayerGroupID,
 			Skin:              sampgo.GetPlayerSkin(id),
 			Car:               NoCar,
 			SeatID:            0,
 			IsSingle:          isSingle,
 			RecordingPlayerID: id,
+			State:             sampgo.PlayerRecordingTypeOnfoot,
 		}
 
 		t.players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeOnfoot
@@ -119,8 +137,7 @@ func (t *T) StopRecording(id int) {
 		)
 		if !t.bots[botNum].IsSingle {
 			botName := fmt.Sprintf("%s%d", BotPrefix, botNum)
-			script := fmt.Sprintf("tbotfoot%d", botNum)
-			sampgo.ConnectNPC(botName, script)
+			sampgo.ConnectNPC(botName, "tbot")
 		}
 	case sampgo.PlayerRecordingTypeDriver:
 		os.Rename(
@@ -129,8 +146,7 @@ func (t *T) StopRecording(id int) {
 		)
 		if !t.bots[botNum].IsSingle {
 			botName := fmt.Sprintf("%s%d", BotPrefix, botNum)
-			script := fmt.Sprintf("tbotcar%d", botNum)
-			sampgo.ConnectNPC(botName, script)
+			sampgo.ConnectNPC(botName, "tbot")
 		}
 	}
 

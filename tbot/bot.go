@@ -7,8 +7,14 @@ import (
 	"strings"
 )
 
+const (
+	BotPrefix = "TBot"
+	MaxBots   = 50
+)
+
 type BotInfo struct {
 	ID                int
+	Number            int
 	BotGroupID        int
 	NickTextDraw      int
 	Skin              int
@@ -16,6 +22,8 @@ type BotInfo struct {
 	SeatID            int
 	IsSingle          bool
 	RecordingPlayerID int
+	State             int
+	Ready             bool
 }
 
 func (b *BotInfo) String() string {
@@ -44,14 +52,25 @@ func (t *T) ConnectBot(id int) {
 		t.AttachBotNick(id, botNum)
 	}
 
+	sampgo.SetPlayerSkin(id, t.bots[botNum].Skin)
+
 	if t.bots[botNum].Car != NoCar {
-		sampgo.PutPlayerInVehicle(id, t.bots[botNum].Car, sampgo.SeatDriver)
+		sampgo.PutPlayerInVehicle(id, t.bots[botNum].Car, t.bots[botNum].SeatID)
 	}
 
 	t.bots[botNum].ID = id
 	t.players[id] = &PlayerInfo{
 		BotInfo: t.bots[botNum],
 	}
+}
+
+func (t *T) GetFreeBotNum() (int, bool) {
+	for i := 0; i < MaxBots; i++ {
+		if _, ok := t.bots[i]; !ok {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (t *T) AttachBotNick(id int, botNumber int) {

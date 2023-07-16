@@ -52,7 +52,10 @@ func init() {
 		tokens := strings.Split(cmd, " ")
 		switch tokens[0][1:] {
 		case "tchain":
-			// ??? think about design
+		// ??? think about design
+		case "thelp":
+			sampgo.SendClientMessage(p.ID, 0xFF0000, "/tlist /tkick /tgkick /tdel /tgdel /tnicks")
+			sampgo.SendClientMessage(p.ID, 0xFF0000, "/tg /tbot /tsingle /tgsingle /tgbot /tgsingle")
 		case "tlist":
 			botList := t.Tlist()
 			for _, bot := range botList {
@@ -78,6 +81,9 @@ func init() {
 			if len(tokens) < 2 {
 				sampgo.SendClientMessage(p.ID, 0xFF0000, "roflan")
 				return true
+			}
+			if tokens[1] == "all" {
+				t.Tdelall()
 			}
 			botNum, _ := strconv.Atoi(tokens[1])
 
@@ -141,9 +147,13 @@ func init() {
 
 			players := t.GetPlayersInGroup(groupID)
 
-			for _, p := range players {
-				botNum := t.GetFreeBotNum()
-				t.TBot(p, botNum, false)
+			for _, player := range players {
+				botNum, ok := t.GetFreeBotNum()
+				if !ok {
+					sampgo.SendClientMessage(p.ID, 0xFF0000, "no more free bots")
+					return true
+				}
+				t.TBot(player, botNum, false)
 			}
 		case "tgsingle":
 			if len(tokens) < 2 {
@@ -154,9 +164,13 @@ func init() {
 
 			players := t.GetPlayersInGroup(groupID)
 
-			for _, p := range players {
-				botNum := t.GetFreeBotNum()
-				t.TBot(p, botNum, true)
+			for _, player := range players {
+				botNum, ok := t.GetFreeBotNum()
+				if !ok {
+					sampgo.SendClientMessage(p.ID, 0xFF0000, "no more free bots")
+					return true
+				}
+				t.TBot(player, botNum, true)
 			}
 		// BOT ONLY
 		case "tbinit":
@@ -165,8 +179,15 @@ func init() {
 				return true
 			}
 
-			playback, recType, isSingle := t.Tbinit(p.ID)
-			sampgo.SendClientMessage(p.ID, 0x000001, fmt.Sprintf("%s %d %d", playback, recType, isSingle))
+			playback, recType, isSingle, groupID := t.Tbinit(p.ID)
+			sampgo.SendClientMessage(p.ID, 0x000001, fmt.Sprintf("%s %d %d %d", playback, recType, isSingle, groupID))
+		case "tbready":
+			if !sampgo.IsPlayerNPC(p.ID) {
+				sampgo.SendClientMessage(p.ID, 0xFF0000, "roflan")
+				return true
+			}
+
+			t.Tbready(p.ID)
 		default:
 			return false
 		}
