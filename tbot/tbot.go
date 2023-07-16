@@ -1,8 +1,10 @@
 package tbot
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/sampgo/sampgo"
+	"os"
 )
 
 type (
@@ -11,8 +13,8 @@ type (
 )
 type T struct {
 	players        map[playerID]*PlayerInfo
-	bots           map[botNumber]*BotInfo
-	isNicksVisible bool
+	Bots           map[botNumber]*BotInfo
+	IsNicksVisible bool
 }
 
 func New() *T {
@@ -36,46 +38,46 @@ func New() *T {
 	//	return
 	//}
 	//
-	//if t.bots[botNum].IsSingle {
+	//if t.Bots[botNum].IsSingle {
 	//		file, err := os.Create(fmt.Sprintf("scriptfiles/tbotsingle%d.cfg", botNum))
 	//		if err != nil {
 	//			sampgo.Print(fmt.Sprintf("create tbot single file: %v", err))
 	//			return
 	//		}
-	//		file.WriteString(strconv.Itoa(t.bots[botNum].BotGroupID))
+	//		file.WriteString(strconv.Itoa(t.Bots[botNum].BotGroupID))
 	//		file.Close()
 	//	}
 
 	t := &T{
 		players:        make(map[playerID]*PlayerInfo),
-		bots:           make(map[botNumber]*BotInfo),
-		isNicksVisible: false,
+		Bots:           make(map[botNumber]*BotInfo),
+		IsNicksVisible: false,
 	}
 	// TODO init from file/sqlite
 	return t
 }
 
 func (t *T) Tbready(id int) {
-	t.players[id].Ready = true
+	t.players[id].ready = true
 	groupID := t.players[id].BotGroupID
 
 	var bots []*BotInfo
-	for _, bot := range t.bots {
+	for _, bot := range t.Bots {
 		if bot.BotGroupID != groupID {
 			continue
 		}
-		if !bot.Ready {
+		if !bot.ready {
 			return
 		}
 		bots = append(bots, bot)
 	}
 
 	for _, bot := range bots {
-		sampgo.SendClientMessage(bot.ID, 0x000002, " ")
+		sampgo.SendClientMessage(bot.id, 0x000002, " ")
 		if bot.Car != NoCar && bot.SeatID != 0 {
-			sampgo.PutPlayerInVehicle(bot.ID, bot.Car, bot.SeatID)
+			sampgo.PutPlayerInVehicle(bot.id, bot.Car, bot.SeatID)
 		}
-		sampgo.SetPlayerSkin(bot.ID, bot.Skin)
+		sampgo.SetPlayerSkin(bot.id, bot.Skin)
 	}
 }
 
@@ -88,66 +90,94 @@ func (t *T) TBot(id int, botNum int, isSingle bool) {
 }
 
 func (t *T) Tgrs(groupID int) {
-	for botNum, bot := range t.bots {
+	for botNum, bot := range t.Bots {
 		if bot.BotGroupID == groupID {
 			t.Trs(botNum)
 		}
 	}
 }
 
+func (t *T) ExportData() {
+	data, err := os.ReadFile("scriptfiles/tbot_dump.txt")
+	if err != nil {
+		sampgo.Print(err.Error())
+		return
+	}
+
+	err = json.Unmarshal(data, &t)
+	if err != nil {
+		sampgo.Print(err.Error())
+	}
+}
+
+func (t *T) InitRun() {
+	for botNum, bot := range t.Bots {
+		if !bot.IsSingle {
+			t.Trs(botNum)
+		}
+	}
+}
+
+func (t *T) SaveData() {
+	data, err := json.Marshal(t)
+	if err != nil {
+		sampgo.Print(err.Error())
+		return
+	}
+	f, _ := os.Create("scriptfiles/tbot_dump.txt")
+	f.Write(data)
+	f.Close()
+}
+
 func (t *T) Trs(botNum int) {
-	bot, ok := t.bots[botNum]
+	_, ok := t.Bots[botNum]
 	if !ok {
 		sampgo.SendClientMessage(0, 0xFF0000, "bot doesn't exist")
 		return
 	}
 
-	if bot.ID != BotNotConnected {
-		sampgo.Kick(bot.ID)
-	}
+	t.Tkick(botNum)
 
 	botName := fmt.Sprintf("%s%d", BotPrefix, botNum)
 	sampgo.ConnectNPC(botName, "tbot")
 }
 
 func (t *T) Tdelall() {
-	for botNum, bot := range t.bots {
-		if bot.ID != BotNotConnected {
-			t.DisconnectBot(botNum)
-		}
+	for botNum := range t.Bots {
+		t.Tkick(botNum)
 
-		delete(t.bots, botNum)
+		delete(t.Bots, botNum)
 	}
 }
 
 func (t *T) Tgdel(groupID int) {
-	for botNum, bot := range t.bots {
+	for botNum, bot := range t.Bots {
 		if bot.BotGroupID != groupID {
 			continue
 		}
 		t.Tkick(botNum)
 
-		delete(t.bots, botNum)
+		delete(t.Bots, botNum)
 	}
 }
 
 func (t *T) Tdel(botNum int) {
 	t.Tkick(botNum)
-	delete(t.bots, botNum)
+	delete(t.Bots, botNum)
 }
 
 func (t *T) Tkick(botNum int) {
-	bot, ok := t.bots[botNum]
+	bot, ok := t.Bots[botNum]
 	if !ok {
 		return
 	}
-	if bot.ID != BotNotConnected {
-		t.DisconnectBot(botNum)
+	if bot.id != BotNotConnected {
+		sampgo.Kick(bot.id)
 	}
 }
 
 func (t *T) Tgkick(groupID int) {
-	for botNum, bot := range t.bots {
+	for botNum, bot := range t.Bots {
 		if bot.BotGroupID != groupID {
 			continue
 		}
@@ -156,8 +186,8 @@ func (t *T) Tgkick(groupID int) {
 }
 
 func (t *T) Tlist() []string {
-	list := make([]string, 0, len(t.bots))
-	for botNum, bot := range t.bots {
+	list := make([]string, 0, len(t.Bots))
+	for botNum, bot := range t.Bots {
 		info := fmt.Sprintf("TBot%d: %s", botNum, bot.String())
 		list = append(list, info)
 	}

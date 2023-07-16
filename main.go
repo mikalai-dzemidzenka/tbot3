@@ -13,7 +13,13 @@ func init() {
 	t := tbot.New()
 
 	sampgo.On("goModeInit", func() bool {
-		sampgo.Print("goModeInit called")
+		t.ExportData()
+		t.InitRun()
+		return true
+	})
+
+	sampgo.On("goModeExit", func() bool {
+		t.SaveData()
 		return true
 	})
 
@@ -51,6 +57,8 @@ func init() {
 		sampgo.SendClientMessage(p.ID, 0xff0000, cmd)
 		tokens := strings.Split(cmd, " ")
 		switch tokens[0][1:] {
+		case "tsave":
+			t.SaveData()
 		case "tchain":
 		// ??? think about design
 		case "thelp":

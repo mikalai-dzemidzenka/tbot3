@@ -65,11 +65,11 @@ func (t *T) IsRecording(id int) bool {
 }
 
 func (t *T) IsRecordingConflict(botNum int) bool {
-	bot, ok := t.bots[botNum]
+	bot, ok := t.Bots[botNum]
 	if !ok {
 		return false
 	}
-	return bot.RecordingPlayerID != NoRecordingBotNumber
+	return bot.recordingPlayerID != NoRecordingBotNumber
 }
 
 func (t *T) StartRecording(id int, botNum int, isSingle bool) {
@@ -79,7 +79,7 @@ func (t *T) StartRecording(id int, botNum int, isSingle bool) {
 	}
 
 	if t.IsBotConnected(botNum) {
-		sampgo.Kick(t.bots[botNum].ID)
+		sampgo.Kick(t.Bots[botNum].id)
 	}
 
 	t.players[id].RecordingBotNumber = botNum
@@ -89,30 +89,30 @@ func (t *T) StartRecording(id int, botNum int, isSingle bool) {
 	state := sampgo.GetPlayerState(id)
 	switch state {
 	case sampgo.PlayerStateDriver, sampgo.PlayerStatePassenger:
-		t.bots[botNum] = &BotInfo{
-			ID:                BotNotConnected,
+		t.Bots[botNum] = &BotInfo{
+			id:                BotNotConnected,
 			Number:            botNum,
 			BotGroupID:        t.players[id].PlayerGroupID,
 			Skin:              sampgo.GetPlayerSkin(id),
 			Car:               sampgo.GetPlayerVehicleID(id),
 			SeatID:            sampgo.GetPlayerVehicleSeat(id),
 			IsSingle:          isSingle,
-			RecordingPlayerID: id,
+			recordingPlayerID: id,
 			State:             sampgo.PlayerRecordingTypeDriver,
 		}
 
 		t.players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeDriver
 		sampgo.StartRecordingPlayerData(id, sampgo.PlayerRecordingTypeDriver, fmt.Sprintf("tbotcar%d", botNum))
 	default:
-		t.bots[botNum] = &BotInfo{
-			ID:                BotNotConnected,
+		t.Bots[botNum] = &BotInfo{
+			id:                BotNotConnected,
 			Number:            botNum,
 			BotGroupID:        t.players[id].PlayerGroupID,
 			Skin:              sampgo.GetPlayerSkin(id),
 			Car:               NoCar,
 			SeatID:            0,
 			IsSingle:          isSingle,
-			RecordingPlayerID: id,
+			recordingPlayerID: id,
 			State:             sampgo.PlayerRecordingTypeOnfoot,
 		}
 
@@ -135,7 +135,7 @@ func (t *T) StopRecording(id int) {
 			fmt.Sprintf("scriptfiles/tbotfoot%d.rec", botNum),
 			fmt.Sprintf("npcmodes/recordings/tbotfoot%d.rec", botNum),
 		)
-		if !t.bots[botNum].IsSingle {
+		if !t.Bots[botNum].IsSingle {
 			botName := fmt.Sprintf("%s%d", BotPrefix, botNum)
 			sampgo.ConnectNPC(botName, "tbot")
 		}
@@ -144,13 +144,13 @@ func (t *T) StopRecording(id int) {
 			fmt.Sprintf("scriptfiles/tbotcar%d.rec", botNum),
 			fmt.Sprintf("npcmodes/recordings/tbotcar%d.rec", botNum),
 		)
-		if !t.bots[botNum].IsSingle {
+		if !t.Bots[botNum].IsSingle {
 			botName := fmt.Sprintf("%s%d", BotPrefix, botNum)
 			sampgo.ConnectNPC(botName, "tbot")
 		}
 	}
 
-	t.bots[botNum].RecordingPlayerID = NoRecordingBotNumber
+	t.Bots[botNum].recordingPlayerID = NoRecordingBotNumber
 	t.players[id].RecordingBotNumber = NoRecordingBotNumber
 	t.players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeNone
 }
