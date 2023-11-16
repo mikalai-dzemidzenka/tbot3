@@ -63,7 +63,7 @@ func init() {
 		// ??? think about design
 		case "thelp":
 			sampgo.SendClientMessage(p.ID, 0xFF0000, "/tlist /tkick /tgkick /tdel /tgdel /tnicks")
-			sampgo.SendClientMessage(p.ID, 0xFF0000, "/tg /tbot /tsingle /tgsingle /tgbot /tgsingle")
+			sampgo.SendClientMessage(p.ID, 0xFF0000, "/tg /tbot /tsingle /tgsingle /tgbot")
 		case "tlist":
 			botList := t.Tlist()
 			for _, bot := range botList {
