@@ -9,16 +9,40 @@ import (
 	"tbot2/tbot"
 )
 
+var tick uint = 1
+var tickRate uint = 100
+
 func init() {
 
 	sampgo.On("goModeInit", func() bool {
-		tbot.ExportData()
-		tbot.InitRun()
+		err := tbot.LoadData("tbot_dump")
+		if err != nil {
+			sampgo.Print(fmt.Sprintf("failed to load tbot_dump.json: %s", err.Error()))
+		}
+		for botNum, bot := range tbot.Bots {
+			if !bot.IsSingle {
+				tbot.Trs(botNum)
+			}
+		}
+		return true
+	})
+
+	//sampgo.On("tick", func() {
+	//	tick++
+	//})
+
+	sampgo.On("playerSpawn", func(p sampgo.Player) bool {
+		if tbot.IsBot(p.ID) {
+			botNum := tbot.Players[p.ID].BotNumber
+			if tbot.IsNicksVisible {
+				tbot.AttachBotNick(botNum)
+			}
+		}
 		return true
 	})
 
 	sampgo.On("goModeExit", func() bool {
-		tbot.SaveData()
+		tbot.SaveData("tbot_dump")
 		return true
 	})
 
@@ -58,13 +82,62 @@ func init() {
 		switch command {
 		default: // unknown command
 			return false
-		case "tsave":
-			tbot.SaveData()
+		case "veh":
+			if len(tokens) < 4 {
+				sampgo.SendClientMessage(p.ID, -1, "USAGE: /veh [VehicleID][Color1][Color2]")
+				return true
+			}
+			carModel, err := strconv.Atoi(tokens[1])
+			if err != nil {
+				sampgo.SendClientMessage(p.ID, -1, "VehicleID must be a number")
+				return true
+			}
+
+			if carModel < 400 || carModel > 611 {
+				sampgo.SendClientMessage(p.ID, 0x0000FF, "Wrong vehicle ID input! (400-611)")
+				return true
+			}
+
+			color1, err := strconv.Atoi(tokens[2])
+			if err != nil {
+				sampgo.SendClientMessage(p.ID, -1, "Color1 must be a number")
+				return true
+			}
+			if color1 > 255 || color1 < 0 {
+				sampgo.SendClientMessage(p.ID, 0x0000FF, "Wrong color input! (0-255)")
+				return true
+			}
+
+			color2, err := strconv.Atoi(tokens[3])
+			if err != nil {
+				sampgo.SendClientMessage(p.ID, -1, "Color2 must be a number")
+				return true
+			}
+			if color2 > 255 || color2 < 0 {
+				sampgo.SendClientMessage(p.ID, 0x0000FF, "Wrong color input! (0-255)")
+				return true
+			}
+
+			var x, y, z float32
+			var angle float32
+			sampgo.GetPlayerPos(p.ID, &x, &y, &z)
+			sampgo.GetPlayerFacingAngle(p.ID, &angle)
+			vehid := sampgo.CreateVehicle(carModel, x, y, z, angle, color1, color2, 60, false)
+			sampgo.PutPlayerInVehicle(p.ID, vehid, 0)
+			tbot.AddCar(vehid, tbot.CarInfo{CarModel: carModel, X: x, Y: y, Z: z, Angle: angle, Color: [2]int{color1, color2}})
+
+		case "deleteveh":
+			vehid := sampgo.GetPlayerVehicleID(p.ID)
+			if vehid != 0 {
+				tbot.RemoveCar(vehid)
+				sampgo.DestroyVehicle(vehid)
+			}
 		case "tchain":
 		// ??? think about design
 		case "thelp":
 			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tlist /tkick /tgkick /tdel /tgdel /tnicks")
-			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tg /tbot /tsingle /tgsingle /tgbot")
+			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tg /tbot /tsingle /tgsingle")
+			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tgbot /tsave /tload")
 		case "tlist":
 			botList := tbot.Tlist()
 			for _, bot := range botList {
@@ -78,6 +151,31 @@ func init() {
 			botNum, _ := strconv.Atoi(tokens[1])
 
 			tbot.Tkick(botNum)
+		case "tload":
+			if len(tokens) < 2 {
+				sampgo.SendClientMessage(p.ID, 0xFFFFFF, "usage: /tload <filename>")
+				return true
+			}
+
+			err := tbot.LoadData(tokens[1])
+			if err != nil {
+				sampgo.SendClientMessage(p.ID, 0xFFFFFF, "usage: /tload <filename>")
+				return true
+			}
+
+			for botNum := range tbot.Bots {
+				tbot.Trs(botNum)
+			}
+
+			sampgo.SendClientMessage(p.ID, 0xFFFFFF, "success!")
+		case "tsave":
+			if len(tokens) < 2 {
+				sampgo.SendClientMessage(p.ID, 0xFFAA00, "usage: /tsave <filename>")
+				return true
+			}
+
+			tbot.SaveData(tokens[1])
+
 		case "tgkick":
 			if len(tokens) < 2 {
 				sampgo.SendClientMessage(p.ID, 0xFFAA00, "usage: /tgkick <group_id>")
@@ -106,7 +204,7 @@ func init() {
 
 			tbot.Tgdel(groupID)
 		case "tnicks":
-			//TODO
+			tbot.Tnicks()
 		case "trs":
 			if len(tokens) < 2 {
 				sampgo.SendClientMessage(p.ID, 0xFFAA00, "usage: /trs <bot_id>")
@@ -187,8 +285,7 @@ func init() {
 				return false
 			}
 
-			playback, recType, isSingle, groupID := tbot.Tbinit(p.ID)
-			sampgo.SendClientMessage(p.ID, 0x000001, fmt.Sprintf("%s %d %d %d", playback, recType, isSingle, groupID))
+			tbot.Tbinit(p.ID)
 		case "tbready":
 			if !sampgo.IsPlayerNPC(p.ID) {
 				return false
@@ -196,6 +293,7 @@ func init() {
 
 			tbot.Tbready(p.ID)
 		}
+
 		return true
 	})
 }

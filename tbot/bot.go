@@ -7,24 +7,50 @@ import (
 	"strings"
 )
 
+var (
+	Bots           = make(map[botNumber]*BotInfo)
+	IsNicksVisible = false
+)
+
 const (
 	BotPrefix = "TBot"
 	MaxBots   = 50
 )
 
+const (
+	NotReady = iota
+	Ready
+	Done
+)
+
 type BotInfo struct {
-	Number     int
+	BotNumber  int
 	BotGroupID int
 	Skin       int
-	Car        int
-	SeatID     int
-	IsSingle   bool
-	State      int
-	// set only in runtime
+	CarInfo
+	SeatID   int
+	IsSingle bool
+	State    int
+
+	BotRuntimeInfo `json:"-"`
+}
+
+type BotRuntimeInfo struct {
 	id                int
 	nickTextDraw      int
 	recordingPlayerID int
-	ready             bool
+	car               int
+	tickToStart       uint
+}
+
+func NewBotRuntimeInfo(car int) BotRuntimeInfo {
+	return BotRuntimeInfo{
+		id:                BotNotConnected,
+		nickTextDraw:      0,
+		recordingPlayerID: NoRecordingBotNumber,
+		car:               car,
+		tickToStart:       0,
+	}
 }
 
 func (b *BotInfo) String() string {
@@ -49,14 +75,10 @@ func ConnectBot(id int) {
 
 	botNum := BotNumberFromName(name)
 
-	if IsNicksVisible {
-		AttachBotNick(id, botNum)
-	}
-
 	sampgo.SetPlayerSkin(id, Bots[botNum].Skin)
 
-	if Bots[botNum].Car != NoCar {
-		sampgo.PutPlayerInVehicle(id, Bots[botNum].Car, Bots[botNum].SeatID)
+	if Bots[botNum].car != NoCar {
+		sampgo.PutPlayerInVehicle(id, Bots[botNum].car, Bots[botNum].SeatID)
 	}
 
 	Bots[botNum].id = id
@@ -74,11 +96,33 @@ func GetFreeBotNum() (int, bool) {
 	return 0, false
 }
 
-func AttachBotNick(id int, botNumber int) {
-	nick := fmt.Sprintf("%s%d", BotPrefix, botNumber)
+func AttachBotNick(botNumber int) {
+	bot, ok := Bots[botNumber]
+	if !ok {
+		return
+	}
+
+	var nick string
+	if bot.IsSingle {
+		nick = fmt.Sprintf("%sS%d id%d g%d", BotPrefix, botNumber, bot.id, bot.BotGroupID)
+	} else {
+		nick = fmt.Sprintf("%s%d id%d g%d", BotPrefix, botNumber, bot.id, bot.BotGroupID)
+	}
 	label := sampgo.Create3DTextLabel(nick, 0x28BA9AFF, 0, 0, 0, 200, -1, false)
-	sampgo.Attach3DTextLabelToPlayer(label, id, 0, 0, 0.3)
+	sampgo.Attach3DTextLabelToPlayer(label, bot.id, 0, 0, 0.3)
 	Bots[botNumber].nickTextDraw = label
+}
+
+func DetachBotNick(botNumber int) {
+	_, ok := Bots[botNumber]
+	if !ok {
+		return
+	}
+
+	if Bots[botNumber].nickTextDraw != 0 {
+		sampgo.Delete3DTextLabel(Bots[botNumber].nickTextDraw)
+		Bots[botNumber].nickTextDraw = 0
+	}
 }
 
 func BotNumberFromName(name string) int {
@@ -98,11 +142,11 @@ func DisconnectBot(botNumber int) {
 	if !ok {
 		return
 	}
-	if bot.nickTextDraw != 0 {
-		bot.nickTextDraw = 0
-		sampgo.Delete3DTextLabel(bot.nickTextDraw)
+
+	if IsNicksVisible {
+		DetachBotNick(botNumber)
 	}
 
 	delete(Players, bot.id)
-	Bots[botNumber].id = BotNotConnected
+	Bots[botNumber].BotRuntimeInfo = NewBotRuntimeInfo(Bots[botNumber].car)
 }

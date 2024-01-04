@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+var Players = make(map[playerID]*PlayerInfo)
+
 const (
 	DefaultGroupID       = 0
 	NoRecordingBotNumber = -1
@@ -89,31 +91,30 @@ func StartRecording(id int, botNum int, isSingle bool) {
 	state := sampgo.GetPlayerState(id)
 	switch state {
 	case sampgo.PlayerStateDriver, sampgo.PlayerStatePassenger:
+		vehID := sampgo.GetPlayerVehicleID(id)
 		Bots[botNum] = &BotInfo{
-			id:                BotNotConnected,
-			Number:            botNum,
-			BotGroupID:        Players[id].PlayerGroupID,
-			Skin:              sampgo.GetPlayerSkin(id),
-			Car:               sampgo.GetPlayerVehicleID(id),
-			SeatID:            sampgo.GetPlayerVehicleSeat(id),
-			IsSingle:          isSingle,
-			recordingPlayerID: id,
-			State:             sampgo.PlayerRecordingTypeDriver,
+			BotNumber:      botNum,
+			BotGroupID:     Players[id].PlayerGroupID,
+			Skin:           sampgo.GetPlayerSkin(id),
+			CarInfo:        Vehs[vehID],
+			SeatID:         sampgo.GetPlayerVehicleSeat(id),
+			IsSingle:       isSingle,
+			State:          sampgo.PlayerRecordingTypeDriver,
+			BotRuntimeInfo: NewBotRuntimeInfo(vehID),
 		}
 
 		Players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeDriver
 		sampgo.StartRecordingPlayerData(id, sampgo.PlayerRecordingTypeDriver, fmt.Sprintf("tbotcar%d", botNum))
 	default:
 		Bots[botNum] = &BotInfo{
-			id:                BotNotConnected,
-			Number:            botNum,
-			BotGroupID:        Players[id].PlayerGroupID,
-			Skin:              sampgo.GetPlayerSkin(id),
-			Car:               NoCar,
-			SeatID:            0,
-			IsSingle:          isSingle,
-			recordingPlayerID: id,
-			State:             sampgo.PlayerRecordingTypeOnfoot,
+			BotNumber:      botNum,
+			BotGroupID:     Players[id].PlayerGroupID,
+			Skin:           sampgo.GetPlayerSkin(id),
+			CarInfo:        CarInfo{},
+			SeatID:         0,
+			IsSingle:       isSingle,
+			State:          sampgo.PlayerRecordingTypeOnfoot,
+			BotRuntimeInfo: NewBotRuntimeInfo(NoCar),
 		}
 
 		Players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeOnfoot
