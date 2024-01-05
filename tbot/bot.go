@@ -28,9 +28,10 @@ type BotInfo struct {
 	BotGroupID int
 	Skin       int
 	CarInfo
-	SeatID   int
-	IsSingle bool
-	State    int
+	SeatID      int
+	IsSingle    bool
+	State       int
+	Attachments [sampgo.MaxPlayerAttachedObjects]Attachment
 
 	BotRuntimeInfo `json:"-"`
 }

@@ -105,6 +105,38 @@ func Trs(botNum int) {
 	sampgo.ConnectNPC(botName, "tbot")
 }
 
+func Tacopy(playerid int, botNum int) {
+	p, ok := Players[playerid]
+	if !ok {
+		return
+	}
+
+	bot, ok := Bots[botNum]
+	if !ok {
+		return
+	}
+
+	bot.Attachments = p.Attachments
+
+	for i, a := range bot.Attachments {
+		sampgo.RemovePlayerAttachedObject(bot.id, i)
+		if a.Modelid != 0 {
+			sampgo.SetPlayerAttachedObject(bot.id, i, a.Modelid, a.Boneid, a.Offx, a.Offy, a.Offz, a.Rx, a.Ry, a.Rz, a.Sx, a.Sy, a.Sz, 0, 0)
+		}
+	}
+}
+
+func Taclear(botNum int) {
+	bot, ok := Bots[botNum]
+	if !ok {
+		return
+	}
+
+	for i := 0; i < sampgo.MaxPlayerAttachedObjects; i++ {
+		sampgo.RemovePlayerAttachedObject(bot.id, i)
+	}
+}
+
 func Tdelall() {
 	for botNum := range Bots {
 		Tdel(botNum)
@@ -183,9 +215,14 @@ func Tbinit(id int) {
 func Tbready(id int) {
 	bot := Players[id].BotInfo
 	if bot.car != NoCar {
-		sampgo.PutPlayerInVehicle(bot.id, bot.car, 0)
+		sampgo.PutPlayerInVehicle(id, bot.car, 0)
 	}
-	sampgo.SetPlayerSkin(bot.id, bot.Skin)
+	sampgo.SetPlayerSkin(id, bot.Skin)
+	for i, a := range bot.Attachments {
+		if a.Modelid != 0 {
+			sampgo.SetPlayerAttachedObject(id, i, a.Modelid, a.Boneid, a.Offx, a.Offy, a.Offz, a.Rx, a.Ry, a.Rz, a.Sx, a.Sy, a.Sz, 0, 0)
+		}
+	}
 
-	sampgo.SendClientMessage(bot.id, 0x000002, " ")
+	sampgo.SendClientMessage(id, 0x000002, " ")
 }

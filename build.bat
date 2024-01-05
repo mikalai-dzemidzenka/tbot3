@@ -1,7 +1,2 @@
-set CGO_CFLAGS_ALLOW=".*"
-set CGO_LDFLAGS_ALLOW=".*"
-set CGO_ENABLED=1
-set GOOS=windows
-set GOARCH=386
-
-go build -buildmode=c-shared -o build/base.dll main.go
+:: run this using msys2 mingw32
+CC=gcc CGO_ENABLED=1 GOOS=windows GOARCH=386 go build -buildmode=c-shared -o tbot3.dll .

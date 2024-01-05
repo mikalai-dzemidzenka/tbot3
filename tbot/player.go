@@ -13,13 +13,17 @@ const (
 	NoRecordingBotNumber = -1
 	BotNotConnected      = -1
 	NoCar                = -1
+	NoAttachments        = -1
 )
 
 type PlayerInfo struct {
-	ID                  int
-	PlayerGroupID       int
-	RecordingBotNumber  int
-	RecordingPlayerType int
+	ID                     int
+	PlayerGroupID          int
+	RecordingBotNumber     int
+	RecordingPlayerType    int
+	CurrentAttachmentIndex int
+	CurrentAttachmentModel int
+	Attachments            [sampgo.MaxPlayerAttachedObjects]Attachment
 	*BotInfo
 }
 
@@ -37,10 +41,12 @@ func SetPlayerGroup(id int, groupID int) {
 
 func ConnectPlayer(id int) {
 	Players[id] = &PlayerInfo{
-		ID:                  id,
-		PlayerGroupID:       DefaultGroupID,
-		RecordingBotNumber:  NoRecordingBotNumber,
-		RecordingPlayerType: sampgo.PlayerRecordingTypeNone,
+		ID:                     id,
+		PlayerGroupID:          DefaultGroupID,
+		RecordingBotNumber:     NoRecordingBotNumber,
+		RecordingPlayerType:    sampgo.PlayerRecordingTypeNone,
+		CurrentAttachmentIndex: NoAttachments,
+		CurrentAttachmentModel: NoAttachments,
 	}
 }
 
@@ -101,6 +107,7 @@ func StartRecording(id int, botNum int, isSingle bool) {
 			IsSingle:       isSingle,
 			State:          sampgo.PlayerRecordingTypeDriver,
 			BotRuntimeInfo: NewBotRuntimeInfo(vehID),
+			Attachments:    Players[id].Attachments,
 		}
 
 		Players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeDriver
@@ -115,6 +122,7 @@ func StartRecording(id int, botNum int, isSingle bool) {
 			IsSingle:       isSingle,
 			State:          sampgo.PlayerRecordingTypeOnfoot,
 			BotRuntimeInfo: NewBotRuntimeInfo(NoCar),
+			Attachments:    Players[id].Attachments,
 		}
 
 		Players[id].RecordingPlayerType = sampgo.PlayerRecordingTypeOnfoot

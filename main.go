@@ -4,13 +4,29 @@ import "C"
 import (
 	"fmt"
 	"github.com/sampgo/sampgo"
+	"golang.org/x/exp/constraints"
 	"strconv"
 	"strings"
-	"tbot2/tbot"
+	"tbot3/tbot"
 )
 
-var tick uint = 1
-var tickRate uint = 100
+const (
+	DialogAttachIndex = iota
+	DialogAttachIndexSelection
+	DialogAttachEditReplace
+	DialogAttachModelSelection
+	DialogAttachBoneSelection
+)
+
+func clamp[T constraints.Float | constraints.Integer](f, low, high T) T {
+	if f < low {
+		return low
+	}
+	if f > high {
+		return high
+	}
+	return f
+}
 
 func init() {
 
@@ -27,16 +43,102 @@ func init() {
 		return true
 	})
 
-	//sampgo.On("tick", func() {
-	//	tick++
-	//})
-
 	sampgo.On("playerSpawn", func(p sampgo.Player) bool {
 		if tbot.IsBot(p.ID) {
 			botNum := tbot.Players[p.ID].BotNumber
 			if tbot.IsNicksVisible {
 				tbot.AttachBotNick(botNum)
 			}
+		}
+		return true
+	})
+
+	sampgo.On("playerEditAttachedObject", func(p sampgo.Player, response int, index int, modelid int, boneid int,
+		offx float32, offy float32, offz float32,
+		rx float32, ry float32, rz float32,
+		sx float32, sy float32, sz float32) bool {
+
+		const sizeLimit = 20
+		sx = clamp(sx, -sizeLimit, sizeLimit)
+		sy = clamp(sy, -sizeLimit, sizeLimit)
+		sz = clamp(sz, -sizeLimit, sizeLimit)
+
+		sampgo.SendClientMessage(p.ID, -1, fmt.Sprintf("SetPlayerAttachedObject(playerid,%d,%d,%d,%g,%g,%g,%g,%g,%g,%g,%g,%g)",
+			index, modelid, boneid, offx, offy, offz, rx, ry, rz, sx, sy, sz))
+
+		sampgo.SetPlayerAttachedObject(p.ID, index, modelid, boneid, offx, offy, offz, rx, ry, rz, sx, sy, sz, 0, 0)
+		tbot.Players[p.ID].Attachments[index] = tbot.Attachment{Index: index, Modelid: modelid, Boneid: boneid, Offx: offx, Offy: offy, Offz: offz, Rx: rx, Ry: ry, Rz: rz, Sx: sx, Sy: sy, Sz: sz}
+
+		sampgo.SendClientMessage(p.ID, -1, "You finished editing an attached object")
+
+		return true
+	})
+
+	sampgo.On("dialogResponse", func(p sampgo.Player, dialogid int, response int, listitem int, inputtext string) bool {
+		switch dialogid {
+		case DialogAttachIndexSelection:
+			if response == 0 {
+				return true
+			}
+
+			if sampgo.IsPlayerAttachedObjectSlotUsed(p.ID, listitem) {
+				sampgo.ShowPlayerDialog(p.ID, DialogAttachEditReplace, sampgo.DialogStyleMsgbox,
+					"{FF0000}Attachment Modification",
+					"Do you wish to edit the attachment in that slot, or delete it?",
+					"Edit", "Delete")
+			} else {
+				var sb strings.Builder
+				for _, att := range tbot.DefaultAttachments {
+					sb.WriteString(att.Name + "\n")
+				}
+				sampgo.ShowPlayerDialog(p.ID, DialogAttachModelSelection, sampgo.DialogStyleList,
+					"{FF0000}Attachment Modification - Model Selection", sb.String(), "Select", "Cancel")
+			}
+
+			tbot.Players[p.ID].CurrentAttachmentIndex = listitem
+		case DialogAttachEditReplace:
+			idx := tbot.Players[p.ID].CurrentAttachmentIndex
+			if response == 1 {
+				sampgo.EditAttachedObject(p.ID, idx)
+			} else {
+				sampgo.RemovePlayerAttachedObject(p.ID, idx)
+				tbot.Players[p.ID].Attachments[idx] = tbot.Attachment{}
+			}
+			tbot.Players[p.ID].CurrentAttachmentIndex = tbot.NoAttachments
+		case DialogAttachModelSelection:
+			if response == 0 {
+				tbot.Players[p.ID].CurrentAttachmentIndex = tbot.NoAttachments
+				return true
+			}
+			// TODO ???
+			//if(GetPVarInt(playerid, "AttachmentUsed") == 1) EditAttachedObject(playerid, listitem);
+			// else
+
+			tbot.Players[p.ID].CurrentAttachmentModel = tbot.DefaultAttachments[listitem].ID
+
+			var sb strings.Builder
+			for _, bone := range tbot.Bones {
+				sb.WriteString(bone + "\n")
+			}
+			sampgo.ShowPlayerDialog(p.ID, DialogAttachBoneSelection, sampgo.DialogStyleList,
+				"{FF0000}Attachment Modification - Bone Selection", sb.String(), "Select", "Cancel")
+
+		case DialogAttachBoneSelection:
+			if response == 1 {
+				sampgo.SetPlayerAttachedObject(p.ID,
+					tbot.Players[p.ID].CurrentAttachmentIndex,
+					tbot.Players[p.ID].CurrentAttachmentModel,
+					listitem+1,
+					0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0, 0)
+				sampgo.EditAttachedObject(p.ID, tbot.Players[p.ID].CurrentAttachmentIndex)
+				sampgo.SendClientMessage(p.ID, -1, fmt.Sprintf("Editing slot %d. Hint: Use {FFFF00}~k~~PED_SPRINT~{FFFFFF} to look around.", tbot.Players[p.ID].CurrentAttachmentIndex))
+			}
+
+			tbot.Players[p.ID].CurrentAttachmentIndex = tbot.NoAttachments
+			tbot.Players[p.ID].CurrentAttachmentModel = tbot.NoAttachments
+
+		default:
+			return false
 		}
 		return true
 	})
@@ -132,12 +234,39 @@ func init() {
 				tbot.RemoveCar(vehid)
 				sampgo.DestroyVehicle(vehid)
 			}
+		case "ta": // TODO show dialog same
+			var sb strings.Builder
+			for i := 0; i < sampgo.MaxPlayerAttachedObjects; i++ {
+				if sampgo.IsPlayerAttachedObjectSlotUsed(p.ID, i) {
+					sb.WriteString(strconv.Itoa(i) + " (Used)\n")
+				} else {
+					sb.WriteString(strconv.Itoa(i) + "\n")
+				}
+			}
+
+			sampgo.ShowPlayerDialog(p.ID, DialogAttachIndexSelection, sampgo.DialogStyleList, "{FF0000}Attachment Modification - Index Selection", sb.String(), "Select", "Cancel")
+		case "tacopy":
+			if len(tokens) < 2 {
+				sampgo.SendClientMessage(p.ID, 0xFFAA00, "usage: /tacopy <bot_id>")
+				return true
+			}
+			botNum, _ := strconv.Atoi(tokens[1])
+
+			tbot.Tacopy(p.ID, botNum)
+		case "taclear":
+			if len(tokens) < 2 {
+				sampgo.SendClientMessage(p.ID, 0xFFAA00, "usage: /taclear <bot_id>")
+				return true
+			}
+			botNum, _ := strconv.Atoi(tokens[1])
+
+			tbot.Taclear(botNum)
 		case "tchain":
 		// ??? think about design
 		case "thelp":
 			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tlist /tkick /tgkick /tdel /tgdel /tnicks")
 			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tg /tbot /tsingle /tgsingle")
-			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tgbot /tsave /tload")
+			sampgo.SendClientMessage(p.ID, 0xFFAA00, "/tgbot /tsave /tload /ta /tacopy /taclear")
 		case "tlist":
 			botList := tbot.Tlist()
 			for _, bot := range botList {
